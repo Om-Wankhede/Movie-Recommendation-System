@@ -1,50 +1,67 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072
 import os
 import gdown
+import streamlit as st
+import pickle
+import pandas as pd
+import requests
 
+# -----------------------------
+# Google Drive File ID
+# -----------------------------
 FILE_ID = "1_i-fqj44Xua9SLAg3J2pK7uxstRS7_vu"
 
+# Download similarity.pkl only once
 if not os.path.exists("similarity.pkl"):
+    print("Downloading similarity.pkl...")
     gdown.download(
         f"https://drive.google.com/uc?id={FILE_ID}",
         "similarity.pkl",
         quiet=False
     )
 
+# -----------------------------
+# TMDB API Key
+# -----------------------------
+API_KEY = "YOUR_TMDB_API_KEY"   # Replace with your API key
 
+# -----------------------------
+# Load Data (cached)
+# -----------------------------
+@st.cache_resource
+def load_similarity():
+    with open("similarity.pkl", "rb") as f:
+        return pickle.load(f)
 
+@st.cache_data
+def load_movies():
+    with open("movies_dict.pkl", "rb") as f:
+        movies_dict = pickle.load(f)
+    return pd.DataFrame(movies_dict)
 
-<<<<<<< HEAD
-=======
->>>>>>> adef2b5 (updated  commit)
-=======
->>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072
-import streamlit as st
-import pickle
-import pandas as pd
-import requests
+similarity = load_similarity()
+movies = load_movies()
 
-# Replace with your own TMDB API Key
-API_KEY = "722116903b347d5f8825323da60964e3"
-
+# -----------------------------
+# Fetch Poster
+# -----------------------------
 def fetch_poster(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}&language=en-US"
 
     response = requests.get(url)
     data = response.json()
 
-    if 'poster_path' not in data or data['poster_path'] is None:
+    if data.get("poster_path") is None:
         return "https://via.placeholder.com/500x750?text=No+Poster"
 
-    return "https://image.tmdb.org/t/p/w500" + data['poster_path']
+    return "https://image.tmdb.org/t/p/w500" + data["poster_path"]
 
-
+# -----------------------------
+# Recommendation Function
+# -----------------------------
 def recommend(movie):
-    movie_index = movies[movies['title'] == movie].index[0]
+    movie_index = movies[movies["title"] == movie].index[0]
     distances = similarity[movie_index]
+
     movie_list = sorted(
         list(enumerate(distances)),
         reverse=True,
@@ -52,51 +69,31 @@ def recommend(movie):
     )[1:6]
 
     reco_movies = []
-    reco_movies_poster = []
+    reco_posters = []
 
     for i in movie_list:
-        # Fetch actual TMDB movie_id
         movie_id = movies.iloc[i[0]].movie_id
-
         reco_movies.append(movies.iloc[i[0]].title)
-        reco_movies_poster.append(fetch_poster(movie_id))
+        reco_posters.append(fetch_poster(movie_id))
 
-    return reco_movies, reco_movies_poster
+    return reco_movies, reco_posters
 
-
-movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
-similarity = pickle.load(open('similarity.pkl', 'rb'))
-
-movies = pd.DataFrame(movies_dict)
-
+# -----------------------------
+# Streamlit UI
+# -----------------------------
 st.title("🎬 Movie Recommendation System")
 
 selected_movie_name = st.selectbox(
     "Select a Movie",
-    movies['title'].values
+    movies["title"].values
 )
 
 if st.button("Recommend"):
     names, posters = recommend(selected_movie_name)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    cols = st.columns(5)
 
-    with col1:
-        st.text(names[0])
-        st.image(posters[0])
-
-    with col2:
-        st.text(names[1])
-        st.image(posters[1])
-
-    with col3:
-        st.text(names[2])
-        st.image(posters[2])
-
-    with col4:
-        st.text(names[3])
-        st.image(posters[3])
-
-    with col5:
-        st.text(names[4])
-        st.image(posters[4])
+    for i in range(5):
+        with cols[i]:
+            st.text(names[i])
+            st.image(posters[i])
