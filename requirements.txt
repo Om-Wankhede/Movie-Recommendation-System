@@ -1,10 +1,14 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072
 streamlit
 pandas
 numpy
 scikit-learn
 requests
 gdown
+<<<<<<< HEAD
 =======
 absl-py==2.4.0
 altair==6.2.2
@@ -75,3 +79,5 @@ watchdog==6.0.0
 websockets==16.1.1
 wrapt==2.1.2
 >>>>>>> adef2b5 (updated  commit)
+=======
+>>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072

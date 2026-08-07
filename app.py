@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072
 import os
 import gdown
 
@@ -14,8 +17,11 @@ if not os.path.exists("similarity.pkl"):
 
 
 
+<<<<<<< HEAD
 =======
 >>>>>>> adef2b5 (updated  commit)
+=======
+>>>>>>> f721fbb573e16476d6db50c5f0e2a5df23b37072
 import streamlit as st
 import pickle
 import pandas as pd
