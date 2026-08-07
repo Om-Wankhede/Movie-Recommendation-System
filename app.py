@@ -1,99 +1,91 @@
 import os
-import gdown
-import streamlit as st
 import pickle
-import pandas as pd
+import random
 import requests
+import pandas as pd
+import streamlit as st
+import gdown
 
-# -----------------------------
-# Google Drive File ID
-# -----------------------------
 FILE_ID = "1_i-fqj44Xua9SLAg3J2pK7uxstRS7_vu"
+API_KEY = "722116903b347d5f8825323da60964e3"
 
-# Download similarity.pkl only once
+st.set_page_config(page_title="Movie Recommendation System", page_icon="🎬", layout="wide")
+
 if not os.path.exists("similarity.pkl"):
-    print("Downloading similarity.pkl...")
-    gdown.download(
-        f"https://drive.google.com/uc?id={FILE_ID}",
-        "similarity.pkl",
-        quiet=False
-    )
-
-# -----------------------------
-# TMDB API Key
-# -----------------------------
-API_KEY = "YOUR_TMDB_API_KEY"   # Replace with your API key
-
-# -----------------------------
-# Load Data (cached)
-# -----------------------------
-@st.cache_resource
-def load_similarity():
-    with open("similarity.pkl", "rb") as f:
-        return pickle.load(f)
+    with st.spinner("Downloading recommendation model..."):
+        gdown.download(
+            f"https://drive.google.com/uc?id={FILE_ID}",
+            "similarity.pkl",
+            quiet=False,
+        )
 
 @st.cache_data
 def load_movies():
-    with open("movies_dict.pkl", "rb") as f:
-        movies_dict = pickle.load(f)
-    return pd.DataFrame(movies_dict)
+    with open("movies_dict.pkl","rb") as f:
+        return pd.DataFrame(pickle.load(f))
 
-similarity = load_similarity()
+@st.cache_resource
+def load_similarity():
+    with open("similarity.pkl","rb") as f:
+        return pickle.load(f)
+
 movies = load_movies()
+similarity = load_similarity()
 
-# -----------------------------
-# Fetch Poster
-# -----------------------------
-def fetch_poster(movie_id):
+def fetch_details(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={API_KEY}&language=en-US"
+    try:
+        data = requests.get(url, timeout=10).json()
+        poster = (
+            "https://image.tmdb.org/t/p/w500" + data["poster_path"]
+            if data.get("poster_path")
+            else "https://via.placeholder.com/300x450?text=No+Poster"
+        )
+        return poster, data.get("overview","No overview available."), data.get("vote_average","-")
+    except Exception:
+        return "https://via.placeholder.com/300x450?text=No+Poster","Unable to fetch details.","-"
 
-    response = requests.get(url)
-    data = response.json()
+def recommend(title):
+    idx = movies[movies["title"]==title].index[0]
+    distances = similarity[idx]
+    rec = sorted(list(enumerate(distances)), key=lambda x:x[1], reverse=True)[1:6]
+    names, posters = [], []
+    for i,_ in rec:
+        names.append(movies.iloc[i]["title"])
+        posters.append(fetch_details(movies.iloc[i]["movie_id"])[0])
+    return names, posters
 
-    if data.get("poster_path") is None:
-        return "https://via.placeholder.com/500x750?text=No+Poster"
-
-    return "https://image.tmdb.org/t/p/w500" + data["poster_path"]
-
-# -----------------------------
-# Recommendation Function
-# -----------------------------
-def recommend(movie):
-    movie_index = movies[movies["title"] == movie].index[0]
-    distances = similarity[movie_index]
-
-    movie_list = sorted(
-        list(enumerate(distances)),
-        reverse=True,
-        key=lambda x: x[1]
-    )[1:6]
-
-    reco_movies = []
-    reco_posters = []
-
-    for i in movie_list:
-        movie_id = movies.iloc[i[0]].movie_id
-        reco_movies.append(movies.iloc[i[0]].title)
-        reco_posters.append(fetch_poster(movie_id))
-
-    return reco_movies, reco_posters
-
-# -----------------------------
-# Streamlit UI
-# -----------------------------
 st.title("🎬 Movie Recommendation System")
 
-selected_movie_name = st.selectbox(
-    "Select a Movie",
-    movies["title"].values
-)
+selected = st.selectbox("Search Movie", movies["title"].values)
 
-if st.button("Recommend"):
-    names, posters = recommend(selected_movie_name)
+movie_row = movies[movies["title"]==selected].iloc[0]
+poster, overview, rating = fetch_details(movie_row["movie_id"])
 
+c1,c2 = st.columns([1,2])
+with c1:
+    st.image(poster, use_container_width=True)
+with c2:
+    st.subheader(selected)
+    st.write(f"⭐ Rating: {rating}")
+    st.write(overview)
+
+st.markdown("### 🎲 Random Movies")
+cols = st.columns(5)
+sample = movies.sample(5, random_state=random.randint(0,100000))
+for col, (_, row) in zip(cols, sample.iterrows()):
+    p,_,_ = fetch_details(row["movie_id"])
+    with col:
+        st.image(p, use_container_width=True)
+        st.caption(row["title"])
+
+if st.button("Recommend Similar Movies"):
+    with st.spinner("Finding recommendations..."):
+        names, posters = recommend(selected)
+
+    st.markdown("## Recommended Movies")
     cols = st.columns(5)
-
     for i in range(5):
         with cols[i]:
-            st.text(names[i])
-            st.image(posters[i])
+            st.image(posters[i], use_container_width=True)
+            st.caption(names[i])
